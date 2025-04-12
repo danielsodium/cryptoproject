@@ -26,9 +26,7 @@ Server::Server(int p) : port(p) {
     }
 }
 
-void Server::Listen() {
-
-    char buffer[1024] = {0};
+void Server::Start() {
     int addrlen = sizeof(address);
     listen(fd, 3);
     std::cout << "Server listening on port " << port << "...\n";
@@ -39,19 +37,24 @@ void Server::Listen() {
         perror("accept failed");
         exit(EXIT_FAILURE);
     }
+}
 
-    // Communicate
+std::string Server::Listen() {
+    // Holds until next message 
+    char buffer[1024] = {0};
     while (true) {
         memset(buffer, 0, sizeof(buffer));
         int valread = read(connection, buffer, 1024);
-        if (valread <= 0) break;
-        std::cout << "Received: " << buffer << std::endl;
-
-        std::string reply = "Echo: ";
-        reply += buffer;
-        send(connection, reply.c_str(), reply.size(), 0);
+        if (valread > 0) break;
     }
+    return std::string(buffer);
+}
 
+void Server::Send(std::string msg) {
+    send(connection, msg.c_str(), msg.size(), 0);
+}
+
+void Server::End() {
     close(connection);
     close(fd);
 }

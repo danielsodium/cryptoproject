@@ -8,7 +8,8 @@ class Client {
 public:
     Client(int p);
     void Connect(std::string address);
-    void Send();
+    void Send(std::string msg);
+    std::string Listen();
     void Disconnect();
 
 private:

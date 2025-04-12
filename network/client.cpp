@@ -29,17 +29,20 @@ void Client::Connect(std::string address) {
     }
 }
 
-void Client::Send() {
-    std::string msg;
+std::string Client::Listen() {
     char buffer[1024] = {0};
-    std::cout << "You: ";
-    std::getline(std::cin, msg);
-    if (msg == "exit") return;
-
-    send(sock, msg.c_str(), msg.size(), 0);
-    int valread = read(sock, buffer, 1024);
-    std::cout << "Server: " << buffer << std::endl;
+    while (true) {
+        memset(buffer, 0, sizeof(buffer));
+        int valread = read(sock, buffer, 1024);
+        if (valread > 0) break;
+    }
+    return std::string(buffer);
 }
+
+void Client::Send(std::string msg) {
+    send(sock, msg.c_str(), msg.size(), 0);
+}
+
 
 void Client::Disconnect() {
     close(sock);

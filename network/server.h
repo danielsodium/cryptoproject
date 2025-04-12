@@ -8,7 +8,10 @@ class Server {
 public:
     Server(int p);
     std::string GetIP();
-    void Listen();
+    void Start();
+    std::string Listen();
+    void Send(std::string msg);
+    void End();
 
 private:
     int port;
