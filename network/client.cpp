@@ -3,9 +3,10 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+#include "algos/des.h"
 #include "client.h"
 
-Client::Client(int p): port(p) {
+Client::Client(int p): port(p), session_key("asdf") {
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         perror("socket creation error");
@@ -14,6 +15,7 @@ Client::Client(int p): port(p) {
 
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
+
 }
 
 void Client::Connect(std::string address) {
@@ -27,6 +29,8 @@ void Client::Connect(std::string address) {
         perror("Connection Failed");
         return;
     }
+
+    // TODO: Secure Connection
 }
 
 std::string Client::Listen() {
@@ -36,11 +40,14 @@ std::string Client::Listen() {
         int valread = read(sock, buffer, 1024);
         if (valread > 0) break;
     }
-    return std::string(buffer);
+    std::string ptxt = DES::decrypt(std::string(buffer), session_key);
+    return ptxt;
 }
 
 void Client::Send(std::string msg) {
-    send(sock, msg.c_str(), msg.size(), 0);
+    std::string ctxt = DES::encrypt(msg, session_key);
+    std::cout << "Sending " << ctxt << std::endl;
+    send(sock, ctxt.c_str(), ctxt.size(), 0);
 }
 
 

@@ -16,6 +16,10 @@ private:
     int port;
     int sock;
     sockaddr_in server;
+
+    int private_key;
+    int public_key;
+    std::string session_key;
 };
 
 #endif

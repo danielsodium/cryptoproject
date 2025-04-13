@@ -18,6 +18,10 @@ private:
     int fd;
     sockaddr_in address;
     int connection;
+
+    int private_key;
+    int public_key;
+    std::string session_key;
 };
 
 #endif

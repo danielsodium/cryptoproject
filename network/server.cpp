@@ -3,9 +3,10 @@
 #include <unistd.h>
 #include <netinet/in.h>
 
+#include "algos/des.h"
 #include "server.h"
 
-Server::Server(int p) : port(p) {
+Server::Server(int p) : port(p), session_key("asdf") {
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == 0) {
         perror("Failed to create socket");
@@ -37,6 +38,9 @@ void Server::Start() {
         perror("accept failed");
         exit(EXIT_FAILURE);
     }
+
+    // TODO: Secure Connection
+
 }
 
 std::string Server::Listen() {
@@ -47,11 +51,13 @@ std::string Server::Listen() {
         int valread = read(connection, buffer, 1024);
         if (valread > 0) break;
     }
-    return std::string(buffer);
+    std::string ptxt = DES::decrypt(std::string(buffer), session_key);
+    return ptxt;
 }
 
 void Server::Send(std::string msg) {
-    send(connection, msg.c_str(), msg.size(), 0);
+    std::string ctxt = DES::encrypt(msg, session_key);
+    send(connection, ctxt.c_str(), ctxt.size(), 0);
 }
 
 void Server::End() {
