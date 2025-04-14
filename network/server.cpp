@@ -64,6 +64,7 @@ std::string Server::Listen() {
         int valread = read(connection, buffer, 1024);
         if (valread > 0) break;
     }
+
     // Check HMAC auth
     std::string res = std::string(buffer);
     std::string tag = res.substr(0, 64);

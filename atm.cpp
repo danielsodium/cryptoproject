@@ -23,12 +23,19 @@ void ATM::Serve() {
     client.Send(username);
     res = client.Listen();
    
-
-    // Send initial message
-    std::string msg;
-    std::getline(std::cin, msg);
-    client.Send(msg);
-    msg = client.Listen();
-    std::cout << msg << std::endl;
+    std::string response = client.Listen();
+    std::cout << response << std::endl;
+    
+    // Command loop for banking operations.
+    while (true) {
+        std::cout << "Enter command (DEPOSIT:<amount>, WITHDRAW:<amount>, BALANCE, EXIT): ";
+        std::string cmd;
+        std::getline(std::cin, cmd);
+        client.Send(cmd);
+        response = client.Listen();
+        std::cout << response << std::endl;
+        if (cmd == "EXIT")
+            break;
+    }
     client.Disconnect();
 }
