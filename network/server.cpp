@@ -4,9 +4,13 @@
 #include <netinet/in.h>
 
 #include "algos/des.h"
+#include "algos/rng.h"
+#include "algos/ecc.h"
+#include "algos/sha.h"
+#include "algos/hmac.h"
 #include "server.h"
 
-Server::Server(int p) : port(p), session_key("asdf") {
+Server::Server(int p) : port(p), session_key("0") {
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == 0) {
         perror("Failed to create socket");
@@ -39,8 +43,17 @@ void Server::Start() {
         exit(EXIT_FAILURE);
     }
 
-    // TODO: Secure Connection
+    private_key = RNG::generate();
+    public_key = ECC::multiply(private_key, ECC::generator);
 
+    long client_key;
+    client_key = std::stol(Listen());
+
+    Send(std::to_string(public_key));
+
+    long shared = ECC::multiply(private_key, client_key);
+
+    session_key = SHA::hash(std::to_string(shared).substr(0,16));
 }
 
 std::string Server::Listen() {
@@ -51,13 +64,23 @@ std::string Server::Listen() {
         int valread = read(connection, buffer, 1024);
         if (valread > 0) break;
     }
-    std::string ptxt = DES::decrypt(std::string(buffer), session_key);
+    // Check HMAC auth
+    std::string res = std::string(buffer);
+    std::string tag = res.substr(0, 64);
+    std::string ctxt = res.substr(64);
+    if (HMAC::generate(session_key, ctxt) != tag) {
+        std::cout << "Unauthenticated message" << std::endl;
+        return "";
+    }
+
+    std::string ptxt = DES::decrypt(ctxt, session_key);
     return ptxt;
 }
 
 void Server::Send(std::string msg) {
     std::string ctxt = DES::encrypt(msg, session_key);
-    send(connection, ctxt.c_str(), ctxt.size(), 0);
+    std::string tagged = HMAC::generate(session_key, ctxt) + ctxt;
+    send(connection, tagged.c_str(), tagged.size(), 0);
 }
 
 void Server::End() {

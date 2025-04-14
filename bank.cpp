@@ -8,6 +8,6 @@ void Bank::Serve() {
     server.Start();
     std::string msg = server.Listen();
     std::cout << msg << std::endl;
-    server.Send(msg);
+    server.Send("Received: " + msg);
     server.End();
 }

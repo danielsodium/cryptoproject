@@ -124,19 +124,15 @@ static const int P[32] = {
     19, 13, 30, 6, 22, 11, 4, 25
 };
 
-// Key Schedule: Left shifts for each round
 static const int KEY_SHIFTS[16] = {
     1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1
 };
 
-// Block size in bytes
-const int BLOCK_SIZE = 8; // 64 bits
+const int BLOCK_SIZE = 8; 
 
-// Random number generator for IV generation
 std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
 std::uniform_int_distribution<int> dist(0, 255);
 
-// Generate a random IV
 std::string generateRandomIV() {
     std::string iv;
     for (int i = 0; i < BLOCK_SIZE; ++i) {
@@ -145,7 +141,6 @@ std::string generateRandomIV() {
     return iv;
 }
 
-// Convert string to bits
 std::vector<bool> stringToBits(const std::string& str) {
     std::vector<bool> bits;
     for (char c : str) {
@@ -156,7 +151,6 @@ std::vector<bool> stringToBits(const std::string& str) {
     return bits;
 }
 
-// Convert bits to string
 std::string bitsToString(const std::vector<bool>& bits) {
     std::string result;
     for (size_t i = 0; i < bits.size(); i += 8) {
@@ -169,7 +163,6 @@ std::string bitsToString(const std::vector<bool>& bits) {
     return result;
 }
 
-// Apply a permutation to a block of bits
 std::vector<bool> permute(const std::vector<bool>& input, const int* table, int size) {
     std::vector<bool> output(size);
     for (int i = 0; i < size; ++i) {
@@ -178,7 +171,6 @@ std::vector<bool> permute(const std::vector<bool>& input, const int* table, int 
     return output;
 }
 
-// Left circular shift on a vector
 std::vector<bool> leftShift(const std::vector<bool>& bits, int shift) {
     std::vector<bool> result = bits;
     for (int i = 0; i < shift; ++i) {
@@ -191,7 +183,6 @@ std::vector<bool> leftShift(const std::vector<bool>& bits, int shift) {
     return result;
 }
 
-// XOR two bit vectors
 std::vector<bool> xorBits(const std::vector<bool>& a, const std::vector<bool>& b) {
     std::vector<bool> result(a.size());
     for (size_t i = 0; i < a.size(); ++i) {
@@ -200,20 +191,16 @@ std::vector<bool> xorBits(const std::vector<bool>& a, const std::vector<bool>& b
     return result;
 }
 
-// S-box substitution
 std::vector<bool> sBoxSubstitution(const std::vector<bool>& input) {
     std::vector<bool> output(32);
     
     for (int i = 0; i < 8; ++i) {
-        // Extract 6 bits for current S-box
         int row = (input[i * 6] << 1) | input[i * 6 + 5];
         int col = (input[i * 6 + 1] << 3) | (input[i * 6 + 2] << 2) | 
                   (input[i * 6 + 3] << 1) | input[i * 6 + 4];
         
-        // Get 4-bit output from S-box
         int value = S[i][row][col];
         
-        // Add the 4 bits to the output
         for (int j = 0; j < 4; ++j) {
             output[i * 4 + j] = (value >> (3 - j)) & 1;
         }
@@ -222,61 +209,45 @@ std::vector<bool> sBoxSubstitution(const std::vector<bool>& input) {
     return output;
 }
 
-// Generate subkeys for each round
 std::vector<std::vector<bool>> generateSubkeys(const std::vector<bool>& key) {
-    // Apply PC-1 permutation
     std::vector<bool> permutedKey = permute(key, PC1, 56);
     
-    // Split into left and right halves
     std::vector<bool> left(permutedKey.begin(), permutedKey.begin() + 28);
     std::vector<bool> right(permutedKey.begin() + 28, permutedKey.end());
     
     std::vector<std::vector<bool>> subkeys(16);
     
     for (int i = 0; i < 16; ++i) {
-        // Apply left shifts
         left = leftShift(left, KEY_SHIFTS[i]);
         right = leftShift(right, KEY_SHIFTS[i]);
         
-        // Combine halves
         std::vector<bool> combined;
         combined.insert(combined.end(), left.begin(), left.end());
         combined.insert(combined.end(), right.begin(), right.end());
         
-        // Apply PC-2 permutation
         subkeys[i] = permute(combined, PC2, 48);
     }
     
     return subkeys;
 }
 
-// DES round function (f-function)
 std::vector<bool> roundFunction(const std::vector<bool>& right, const std::vector<bool>& subkey) {
-    // Expansion
     std::vector<bool> expanded = permute(right, E, 48);
     
-    // XOR with subkey
     std::vector<bool> xored = xorBits(expanded, subkey);
     
-    // S-box substitution
     std::vector<bool> substituted = sBoxSubstitution(xored);
     
-    // P-box permutation
     return permute(substituted, P, 32);
 }
 
-// Core DES algorithm for one 64-bit block
 std::vector<bool> processBlock(const std::vector<bool>& block, const std::vector<std::vector<bool>>& subkeys, bool decrypt) {
-    // Initial permutation
     std::vector<bool> permuted = permute(block, IP, 64);
     
-    // Split into left and right halves
     std::vector<bool> left(permuted.begin(), permuted.begin() + 32);
     std::vector<bool> right(permuted.begin() + 32, permuted.end());
     
-    // 16 rounds of encryption/decryption
     for (int i = 0; i < 16; ++i) {
-        // For decryption, use subkeys in reverse order
         int keyIndex = decrypt ? 15 - i : i;
         
         std::vector<bool> temp = right;
@@ -285,22 +256,18 @@ std::vector<bool> processBlock(const std::vector<bool>& block, const std::vector
         left = temp;
     }
     
-    // Swap left and right (final swap)
     std::vector<bool> combined;
     combined.insert(combined.end(), right.begin(), right.end());
     combined.insert(combined.end(), left.begin(), left.end());
     
-    // Final permutation
     return permute(combined, IP_INV, 64);
 }
 
-// PKCS#7 padding
 std::vector<bool> addPKCS7Padding(const std::vector<bool>& input) {
-    // Calculate bytes of padding needed
     int blockSizeBits = BLOCK_SIZE * 8;
     int paddingBytes = BLOCK_SIZE - (input.size() / 8) % BLOCK_SIZE;
     if (paddingBytes == 0) {
-        paddingBytes = BLOCK_SIZE; // If input is already a multiple of block size, add a full block
+        paddingBytes = BLOCK_SIZE;
     }
     
     std::vector<bool> padded = input;
@@ -315,41 +282,32 @@ std::vector<bool> addPKCS7Padding(const std::vector<bool>& input) {
     return padded;
 }
 
-// Remove PKCS#7 padding
 std::vector<bool> removePKCS7Padding(const std::vector<bool>& input) {
     if (input.empty()) {
         return input;
     }
     
-    // Get the padding value from the last byte
     int size = input.size();
     std::vector<bool> lastByte(input.end() - 8, input.end());
     std::string byteStr = bitsToString(lastByte);
     int paddingBytes = static_cast<unsigned char>(byteStr[0]);
     
-    // Validate padding
     if (paddingBytes > BLOCK_SIZE || paddingBytes == 0) {
-        // Invalid padding - return input as is
         return input;
     }
     
-    // Check if all padding bytes have the same value
     for (int i = 1; i <= paddingBytes; ++i) {
         std::vector<bool> padByte(input.end() - i * 8, input.end() - (i-1) * 8);
         std::string padByteStr = bitsToString(padByte);
         if (static_cast<unsigned char>(padByteStr[0]) != paddingBytes) {
-            // Invalid padding - return input as is
             return input;
         }
     }
     
-    // Remove padding
     return std::vector<bool>(input.begin(), input.end() - paddingBytes * 8);
 }
 
-// Main encryption function using CBC mode with random IV and PKCS#7 padding
 std::string encrypt(const std::string& ptxt, const std::string& key) {
-    // Generate a random IV
     std::string iv = generateRandomIV();
     
     // Convert input to bits
@@ -357,26 +315,19 @@ std::string encrypt(const std::string& ptxt, const std::string& key) {
     std::vector<bool> keyBits = stringToBits(key);
     std::vector<bool> ivBits = stringToBits(iv);
     
-    // Ensure key is 64 bits (8 bytes)
     if (keyBits.size() < 64) {
-        // Pad key with zeros if necessary
         keyBits.resize(64, false);
     } else if (keyBits.size() > 64) {
-        // Truncate key if too long
         keyBits.resize(64);
     }
     
-    // Generate subkeys
     std::vector<std::vector<bool>> subkeys = generateSubkeys(keyBits);
     
-    // Apply PKCS#7 padding to plaintext
     std::vector<bool> paddedPlaintext = addPKCS7Padding(plaintextBits);
     
-    // Process each 64-bit block using CBC mode
     std::vector<bool> ciphertextBits;
-    std::vector<bool> previousBlock = ivBits; // First previous block is the IV
+    std::vector<bool> previousBlock = ivBits;
     
-    // Prepend IV to ciphertext
     ciphertextBits.insert(ciphertextBits.end(), ivBits.begin(), ivBits.end());
     
     for (size_t i = 0; i < paddedPlaintext.size(); i += 64) {
@@ -385,83 +336,63 @@ std::string encrypt(const std::string& ptxt, const std::string& key) {
                               ? paddedPlaintext.begin() + i + 64 
                               : paddedPlaintext.end());
         
-        // Ensure block is 64 bits
         if (block.size() < 64) {
             block.resize(64, false);
         }
         
-        // XOR with previous ciphertext block (CBC mode)
         std::vector<bool> xoredBlock = xorBits(block, previousBlock);
         
-        // Encrypt block
         std::vector<bool> encryptedBlock = processBlock(xoredBlock, subkeys, false);
         
-        // This becomes the previous block for the next iteration
         previousBlock = encryptedBlock;
         
-        // Add to ciphertext
         ciphertextBits.insert(ciphertextBits.end(), encryptedBlock.begin(), encryptedBlock.end());
     }
     
-    // Convert bits back to string
     return bitsToString(ciphertextBits);
 }
 
-// Main decryption function for CBC mode with IV and PKCS#7 padding
 std::string decrypt(const std::string& ctxt, const std::string& key) {
     // Convert input to bits
     std::vector<bool> ciphertextBits = stringToBits(ctxt);
     std::vector<bool> keyBits = stringToBits(key);
     
-    // Ensure key is 64 bits
     if (keyBits.size() < 64) {
         keyBits.resize(64, false);
     } else if (keyBits.size() > 64) {
         keyBits.resize(64);
     }
     
-    // Extract IV from ciphertext (first 64 bits)
     if (ciphertextBits.size() < 64) {
-        // Invalid ciphertext - too short to contain IV
         return "";
     }
     
     std::vector<bool> ivBits(ciphertextBits.begin(), ciphertextBits.begin() + 64);
     std::vector<bool> actualCiphertext(ciphertextBits.begin() + 64, ciphertextBits.end());
     
-    // Generate subkeys
     std::vector<std::vector<bool>> subkeys = generateSubkeys(keyBits);
     
-    // Process each 64-bit block using CBC mode
     std::vector<bool> plaintextBits;
-    std::vector<bool> previousBlock = ivBits; // First previous block is the IV
+    std::vector<bool> previousBlock = ivBits; 
     
     for (size_t i = 0; i < actualCiphertext.size(); i += 64) {
         if (i + 64 > actualCiphertext.size()) {
-            // Incomplete block, can't decrypt
             break;
         }
         
         std::vector<bool> block(actualCiphertext.begin() + i, actualCiphertext.begin() + i + 64);
         
-        // Decrypt block
         std::vector<bool> decryptedBlock = processBlock(block, subkeys, true);
         
-        // XOR with previous ciphertext block (CBC mode)
         std::vector<bool> xoredBlock = xorBits(decryptedBlock, previousBlock);
         
-        // This ciphertext block becomes the "previous" for the next iteration
         previousBlock = block;
         
-        // Add to plaintext
         plaintextBits.insert(plaintextBits.end(), xoredBlock.begin(), xoredBlock.end());
     }
     
-    // Remove PKCS#7 padding
     std::vector<bool> unpaddedPlaintext = removePKCS7Padding(plaintextBits);
     
-    // Convert bits back to string
     return bitsToString(unpaddedPlaintext);
 }
-
-} // namespace DES
+}

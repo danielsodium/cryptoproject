@@ -17,8 +17,10 @@ private:
     int sock;
     sockaddr_in server;
 
-    int private_key;
-    int public_key;
+    bool secure;
+
+    long private_key;
+    long public_key;
     std::string session_key;
 };
 

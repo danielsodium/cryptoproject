@@ -4,8 +4,7 @@
 #include <string> 
 
 namespace RNG {
-    float generate();
+    long generate();
 }
 
 #endif
-

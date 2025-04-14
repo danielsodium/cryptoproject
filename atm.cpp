@@ -14,9 +14,7 @@ void ATM::Serve() {
     std::cout << "Enter ip address of bank: " << std::endl;
     std::getline(std::cin, ip);
     client.Connect(ip);
-    std::cout << "Established connection to bank" << std::endl;
-
-    // TODO: Establish secure connection
+    std::cout << "Established secure connection to bank" << std::endl;
 
     // Prompt for username
     std::cout << "Enter username: " << std::endl;
