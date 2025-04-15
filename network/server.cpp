@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <vector>
 #include <unistd.h>
 #include <netinet/in.h>
 
@@ -43,35 +44,36 @@ void Server::Start() {
         exit(EXIT_FAILURE);
     }
 
-    private_key = RNG::generate();
-    public_key = ECC::multiply(private_key, ECC::generator);
+    // Secure the connection
+    private_key = RNG::generate() % 10000;
+    public_key = ECC::multiply(ECC::generator, private_key);
 
-    long client_key;
-    client_key = std::stol(Listen());
+    ECC::Point client_key;
+    client_key = ECC::deserialize(Listen());
 
-    Send(std::to_string(public_key));
+    Send(ECC::serialize(public_key));
 
-    long shared = ECC::multiply(private_key, client_key);
+    ECC::Point shared = ECC::multiply(client_key, private_key);
 
-    session_key = SHA::hash(std::to_string(shared).substr(0,16));
+    session_key = SHA::hash(std::to_string(shared.x).substr(0,16));
 }
 
 std::string Server::Listen() {
-    // Holds until next message 
-    char buffer[1024] = {0};
-    while (true) {
-        memset(buffer, 0, sizeof(buffer));
-        int valread = read(connection, buffer, 1024);
-        if (valread > 0) break;
-    }
+    uint32_t len;
+    recv(connection, &len, sizeof(len), MSG_WAITALL); 
+    len = ntohl(len); 
+    
+    std::vector<char> buffer(len);
+    recv(connection, buffer.data(), len, MSG_WAITALL);
+    std::string res(buffer.begin(), buffer.end());
 
     // Check HMAC auth
-    std::string res = std::string(buffer);
     std::string tag = res.substr(0, 64);
     std::string ctxt = res.substr(64);
-    if (HMAC::generate(session_key, ctxt) != tag) {
+    std::string expected = HMAC::generate(session_key, ctxt);
+    if (expected != tag) {
         std::cout << "Unauthenticated message" << std::endl;
-        return "";
+        return Listen();
     }
 
     std::string ptxt = DES::decrypt(ctxt, session_key);
@@ -80,7 +82,11 @@ std::string Server::Listen() {
 
 void Server::Send(std::string msg) {
     std::string ctxt = DES::encrypt(msg, session_key);
-    std::string tagged = HMAC::generate(session_key, ctxt) + ctxt;
+    std::string tag = HMAC::generate(session_key, ctxt);
+    std::string tagged = tag + ctxt;
+
+    uint32_t len = htonl(tagged.size());
+    send(connection, &len, sizeof(len), 0);
     send(connection, tagged.c_str(), tagged.size(), 0);
 }
 

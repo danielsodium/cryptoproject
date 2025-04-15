@@ -1,1 +1,1 @@
-g++ *.cpp */*.cpp */*/*.cpp
+g++ *.cpp */*.cpp */*/*.cpp -o software.exe

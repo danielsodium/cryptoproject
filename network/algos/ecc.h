@@ -1,29 +1,23 @@
 #ifndef ECC_H 
 #define ECC_H 
 
-#include <string> 
-
-/**
- * Namespace instead of a class
- * because the graph will be hardcoded
- * 
- * This will have to change drastically from
- * longs to points
- */
+#include <string>
 
 namespace ECC {
-    class Point {
+    struct Point {
         long x;
         long y;
     };
 
-    long multiply(long p1, long p2);
-    static long generator = 0;
+    extern Point generator;
+    extern long a, b, p;
 
-    // coefficients of the equation
-    static int degree = 4;
-    // static long[] equation = {1,1,1,1,1};
+    Point multiply(const Point& p, long scalar);
 
+    std::string serialize(const Point& p);
+    Point deserialize(const std::string& str);
+
+    bool is_on_curve(const Point& p);
 }
 
 #endif

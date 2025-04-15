@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <vector>
 #include <unistd.h>
 #include <arpa/inet.h>
 
@@ -21,57 +22,63 @@ Client::Client(int p): port(p), session_key("0") {
     server.sin_port = htons(port);
 }
 
-void Client::Connect(std::string address) {
+bool Client::Connect(std::string address) {
     if (inet_pton(AF_INET, address.c_str(), &server.sin_addr) <= 0) {
         std::cerr << "Invalid address or Address not supported\n";
-        return;
+        return false;
     }
 
     // Connect to server
     if (connect(sock, (sockaddr *)&server, sizeof(server)) < 0) {
         perror("Connection Failed");
-        return;
+        return false;
     }
 
     // Secure the connection
-    private_key = RNG::generate();
-    public_key = ECC::multiply(private_key, ECC::generator);
+    private_key = RNG::generate() % 10000;
+    public_key = ECC::multiply(ECC::generator, private_key);
 
-    Send(std::to_string(public_key));
+    Send(ECC::serialize(public_key));
 
-    long server_key;
-    server_key = std::stol(Listen());
+    ECC::Point server_key;
+    std::string res = Listen();
+    server_key = ECC::deserialize(res);
 
-    long shared = ECC::multiply(private_key, server_key);
+    ECC::Point shared = ECC::multiply(server_key, private_key);
 
-    session_key = SHA::hash(std::to_string(shared).substr(0,16));
+    session_key = SHA::hash(std::to_string(shared.x).substr(0,16));
+    std::cout << "SESSION KEY: " << session_key << std::endl;
+    return true;
 }
 
 std::string Client::Listen() {
-    char buffer[1024] = {0};
-    while (true) {
-        memset(buffer, 0, sizeof(buffer));
-        int valread = read(sock, buffer, 1024);
-        if (valread > 0) break;
-    }
+    uint32_t len;
+    recv(sock, &len, sizeof(len), MSG_WAITALL);
+    len = ntohl(len);
+    
+    std::vector<char> buffer(len);
+    recv(sock, buffer.data(), len, MSG_WAITALL);
+    std::string res(buffer.begin(), buffer.end());
 
     // Check HMAC auth
-    std::string res = std::string(buffer);
     std::string tag = res.substr(0, 64);
     std::string ctxt = res.substr(64);
-    if (HMAC::generate(session_key, ctxt) != tag) {
+    std::string expected = HMAC::generate(session_key, ctxt);
+    if (expected != tag) {
         std::cout << "Unauthenticated message" << std::endl;
-        return "";
+        return Listen();
     }
 
     std::string ptxt = DES::decrypt(ctxt, session_key);
-    std::cout << ptxt << std::endl;
     return ptxt;
 }
 
 void Client::Send(std::string msg) {
     std::string ctxt = DES::encrypt(msg, session_key);
-    std::string tagged = HMAC::generate(session_key, ctxt) + ctxt;
+    std::string tag = HMAC::generate(session_key, ctxt);
+    std::string tagged = tag + ctxt;
+    uint32_t len = htonl(tagged.size());
+    send(sock, &len, sizeof(len), 0);
     send(sock, tagged.c_str(), tagged.size(), 0);
 }
 

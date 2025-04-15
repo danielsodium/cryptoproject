@@ -3,11 +3,12 @@
 
 #include <string> 
 #include <netinet/in.h>
+#include "algos/ecc.h"
 
 class Client {
 public:
     Client(int p);
-    void Connect(std::string address);
+    bool Connect(std::string address);
     void Send(std::string msg);
     std::string Listen();
     void Disconnect();
@@ -17,10 +18,8 @@ private:
     int sock;
     sockaddr_in server;
 
-    bool secure;
-
     long private_key;
-    long public_key;
+    ECC::Point public_key;
     std::string session_key;
 };
 

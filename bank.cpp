@@ -1,40 +1,66 @@
 #include "bank.h"
 #include <iostream>
+#include <unordered_map>
+#include <sstream>
 
 Bank::Bank() : server(Server(8080)) {
 }
 
 void Bank::Serve() {
+    std::unordered_map<std::string, std::pair<std::string, double>> user_db = {
+        {"alice", {"asdf", 1000.0}},
+        {"bob", {"qwer", 750.0}}
+    };
+
     server.Start();
-    std::string msg = server.Listen();
-    std::cout << msg << std::endl;
-    server.Send("Received: " + msg);
-    // Initialize balance (for example, starting with $1000).
-    int balance = 1000;
+    std::cout << "Established secure connection with ATM." << std::endl;
+
+    bool authenticated = false;
+    std::string current_user;
+
     while (true) {
-        std::string cmd = server.Listen();
-        if (cmd == "EXIT") {
-            server.Send("Goodbye");
-            break;
-        } else if (cmd.find("DEPOSIT:") == 0) {
-            int amount = std::stoi(cmd.substr(8));
-            balance += amount;
-            server.Send("Deposited " + std::to_string(amount) +
-                        ". New balance: " + std::to_string(balance));
-        } else if (cmd.find("WITHDRAW:") == 0) {
-            int amount = std::stoi(cmd.substr(9));
-            if (amount > balance) {
-                server.Send("Insufficient funds.");
+        std::string msg = server.Listen();
+        std::istringstream iss(msg);
+        std::string command;
+        iss >> command;
+
+        if (command == "LOGIN") {
+            std::string username, password;
+            iss >> username >> password;
+
+            if (user_db.find(username) != user_db.end() && user_db[username].first == password) {
+                authenticated = true;
+                current_user = username;
+                server.Send("AUTH_SUCCESS");
             } else {
-                balance -= amount;
-                server.Send("Withdrew " + std::to_string(amount) +
-                            ". New balance: " + std::to_string(balance));
+                server.Send("AUTH_FAILED");
             }
-        } else if (cmd == "BALANCE") {
-            server.Send("Current balance: " + std::to_string(balance));
+        } else if (!authenticated) {
+            server.Send("NOT_AUTHENTICATED");
+        } else if (command == "BALANCE") {
+            double balance = user_db[current_user].second;
+            server.Send(std::to_string(balance));
+        } else if (command == "DEPOSIT") {
+            double amount;
+            iss >> amount;
+            user_db[current_user].second += amount;
+            server.Send("Deposit successful.");
+        } else if (command == "WITHDRAW") {
+            double amount;
+            iss >> amount;
+            if (user_db[current_user].second >= amount) {
+                user_db[current_user].second -= amount;
+                server.Send("Withdrawal successful.");
+            } else {
+                server.Send("Insufficient funds.");
+            }
+        } else if (command == "EXIT") {
+            server.Send("Goodbye!");
+            break;
         } else {
             server.Send("Unknown command.");
         }
     }
+
     server.End();
 }
